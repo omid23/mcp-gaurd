@@ -1,0 +1,100 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install "ruff>=0.5"
+      - run: ruff check --output-format=github src tests
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+      - name: Regression eval (built-in sample, offline)
+        run: mcp-guard eval -d sample --split all --intent --out reports --name ci-sample
+      - name: Upload eval report
+        if: matrix.python == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: reports/ci-sample*
+          if-no-files-found: warn
+
+  build:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build twine
+      - run: python -m build
+      - run: twine check --strict dist/*
+      - name: Install wheel and smoke-test the CLI
+        run: |
+          python -m venv /tmp/wheel-venv
+          /tmp/wheel-venv/bin/pip install dist/*.whl
+          /tmp/wheel-venv/bin/mcp-guard --help
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  k8s-manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Render kustomization and validate against the Kubernetes schemas
+        run: |
+          kubectl kustomize deploy/k8s > /tmp/rendered.yaml
+          docker run --rm -i ghcr.io/yannh/kubeconform:v0.6.7 -strict -summary - < /tmp/rendered.yaml
+          docker run --rm -i ghcr.io/yannh/kubeconform:v0.6.7 -strict -summary - < deploy/k8s/secret.example.yaml
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t mcp-guard-gateway:ci .
+      - name: End-to-end smoke test (demo servers -> gateway -> demo client)
+        run: |
+          docker compose up -d --build --wait --wait-timeout 120 upstream gateway jaeger
+          docker compose run --rm demo
+      - name: Gateway logs
+        if: failure()
+        run: docker compose logs gateway upstream
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcp-guard-config
+  labels: {app: mcp-guard}
+data:
+  gateway.yaml: |
+    gateway:
+      port: 8800
+      fail_mode: ask
+      lockfile: /etc/mcp-guard/mcp-guard.lock
+    auth:
+      mode: api_key
+    decision:
+      backend: jev
+      fallback: heuristic
+      jev: {model: jev-1.13, timeout_s: 3}
+    policy:
+      egress_allowlist: ["yourcompany.com"]
+    servers:
+      github:
+        url: https://api.githubcopilot.com/mcp/
+        headers: {Authorization: "Bearer ${GITHUB_MCP_TOKEN}"}
+        pinning: {mode: strict}
+        tools:
+          delete_repository: {action: deny}
+    audit:
+      jsonl_path: /var/log/mcp-guard/audit.jsonl
+    telemetry:
+      otlp_endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+  # Generate with `mcp-guard pin -c gateway.yaml`, review the descriptions, then paste here.
+  mcp-guard.lock: |
+    {"version": 1, "servers": {}}

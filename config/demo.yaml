@@ -1,0 +1,46 @@
+# Gateway config for the local demo (demo servers on :9100, gateway on :8800).
+# Runs offline with the heuristic backend; set MCPGUARD_BACKEND=jev and
+# TYPESAFE_API_KEY to use Jev.
+
+gateway:
+  port: 8800
+  approval_ttl_s: 300
+  fail_mode: ask
+
+decision:
+  backend: ${MCPGUARD_BACKEND:-heuristic}
+  fallback: heuristic
+  thresholds:
+    deny: 0.85
+    ask: 0.5
+
+output_scan:
+  enabled: true
+  action: quarantine
+  threshold: 0.7
+
+description_scan:
+  enabled: true
+  action: hide
+  threshold: 0.7
+
+policy:
+  egress_allowlist: ["acme.example"]
+
+servers:
+  workspace:
+    url: ${DEMO_UPSTREAM:-http://localhost:9100}/workspace/mcp
+    pinning: {mode: tofu}
+    tools:
+      list_dir: {action: allow, reason: read-only listing}
+      deploy: {action: allow, reason: the server asks for its own confirmation}
+  weather:
+    url: ${DEMO_UPSTREAM:-http://localhost:9100}/weather/mcp
+    pinning: {mode: tofu}
+
+audit:
+  jsonl_path: ${MCPGUARD_AUDIT:-audit.jsonl}
+
+telemetry:
+  service_name: mcp-guard
+  otlp_endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
