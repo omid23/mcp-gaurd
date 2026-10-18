@@ -11,7 +11,7 @@ build/
 audit.jsonl
 *.jsonl.tmp
 # MCPTox is converted locally and not redistributed
-data/
+/data/
 reports/*.json
 mcp-guard.lock
 .idea/
