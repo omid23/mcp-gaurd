@@ -1,0 +1,75 @@
+# Production-style example. Every value can use ${ENV} or ${ENV:-default}.
+
+gateway:
+  host: 0.0.0.0
+  port: 8800
+  require_headers: true            # reject requests whose Mcp-Method/Mcp-Name disagree with the body
+  protocol_versions: ["2026-07-28"]
+  state_secret_env: MCPGUARD_STATE_SECRET   # HMAC key for approval state; share across replicas
+  approval_ttl_s: 300
+  fail_mode: ask                   # what a tool call gets if the decision model is down: ask | deny
+  redact_before_model: true        # mask secrets before state leaves for a hosted model
+  list_cache_ttl_s: 300            # upper bound; the upstream ttlMs hint is used when smaller
+  lockfile: /etc/mcp-guard/mcp-guard.lock   # reviewed tool pins (see `mcp-guard pin`)
+
+auth:
+  mode: api_key                    # none | api_key | header
+  api_keys_env: MCPGUARD_API_KEYS  # "key1:alice,key2:ci-bot"
+  principal_header: x-forwarded-user
+
+decision:
+  backend: jev                     # heuristic | jev | llm | classifier
+  fallback: heuristic              # used when the primary backend errors
+  thresholds: {deny: 0.85, ask: 0.5}
+  jev:
+    base_url: https://api.typesafe.ai   # or a local /v1/systemone server running an open model
+    model: jev-1.13                     # pin the version so evals stay comparable
+    api_key_env: TYPESAFE_API_KEY
+    timeout_s: 3
+    max_retries: 2
+  llm:
+    base_url: https://api.openai.com/v1
+    model: gpt-6-luna
+    api_key_env: OPENAI_API_KEY
+  cache_ttl_s: 60
+  max_state_chars: 6000
+
+output_scan: {enabled: true, action: quarantine, threshold: 0.7, max_chars: 12000}
+description_scan: {enabled: true, action: hide, threshold: 0.7}
+
+policy:
+  block_sensitive_paths: true
+  block_secrets_in_args: true
+  block_dangerous_commands: true
+  ask_on_external_egress: true
+  ask_on_privilege_change: true
+  egress_allowlist: ["yourcompany.com", "github.com"]
+  rules:
+    - name: no-prod-db-writes
+      server: postgres
+      tool: query
+      pattern: "(?i)\\b(insert|update|delete|alter|drop)\\b"
+      action: ask
+      reason: writes to the production database need approval
+
+servers:
+  github:
+    url: https://api.githubcopilot.com/mcp/
+    headers:
+      Authorization: Bearer ${GITHUB_MCP_TOKEN}
+    pinning: {mode: strict}
+    tools:
+      delete_repository: {action: deny}
+      merge_pull_request: {action: ask}
+  postgres:
+    url: http://postgres-mcp.internal:8000/mcp
+    pinning: {mode: strict}
+    default_action: guard
+
+audit:
+  jsonl_path: /var/log/mcp-guard/audit.jsonl
+  include_arguments: false         # store a SHA-256 of arguments, not the arguments
+
+telemetry:
+  service_name: mcp-guard
+  otlp_endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}

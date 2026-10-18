@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcp-guard-gateway"
+version = "0.1.0"
+description = "Stateless MCP (2026-07-28) policy gateway with decision-model guardrails, tool pinning and evals"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Omid" }]
+keywords = ["mcp", "model-context-protocol", "ai-security", "guardrails", "jev", "decision-models", "agents"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Topic :: Security",
+]
+dependencies = [
+  "starlette>=0.37",
+  "uvicorn>=0.29",
+  "httpx>=0.27",
+  "pydantic>=2.6",
+  "pyyaml>=6.0",
+  "opentelemetry-api>=1.24",
+  "opentelemetry-sdk>=1.24",
+]
+
+[project.optional-dependencies]
+otlp = ["opentelemetry-exporter-otlp-proto-http>=1.24"]
+classifier = ["transformers>=4.40", "torch>=2.2"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.5"]
+
+[project.scripts]
+mcp-guard = "mcp_guard.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp_guard"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]

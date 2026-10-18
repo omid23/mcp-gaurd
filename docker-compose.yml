@@ -1,0 +1,38 @@
+# Local demo: demo MCP servers -> mcp-guard -> traces in Jaeger (http://localhost:16686).
+#   docker compose up --build
+#   docker compose run --rm demo
+services:
+  upstream:
+    build: .
+    command: ["demo-servers", "--host", "0.0.0.0", "--port", "9100"]
+    ports: ["9100:9100"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9100/healthz')"]
+      interval: 5s
+
+  gateway:
+    build: .
+    command: ["serve", "--config", "/app/config/demo.yaml"]
+    ports: ["8800:8800"]
+    environment:
+      DEMO_UPSTREAM: http://upstream:9100
+      MCPGUARD_STATE_SECRET: ${MCPGUARD_STATE_SECRET:-change-me-in-production}
+      MCPGUARD_BACKEND: ${MCPGUARD_BACKEND:-heuristic}
+      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      MCPGUARD_AUDIT: /tmp/audit.jsonl
+    depends_on:
+      upstream: {condition: service_healthy}
+      jaeger: {condition: service_started}
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports: ["16686:16686", "4318:4318"]
+
+  demo:
+    build: .
+    profiles: ["demo"]
+    command: ["demo", "--gateway", "http://gateway:8800", "--upstream", "http://upstream:9100"]
+    depends_on: [gateway]

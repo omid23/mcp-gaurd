@@ -1,0 +1,82 @@
+# Stateless: every replica serves any request. Approvals work across replicas
+# because the HMAC key (MCPGUARD_STATE_SECRET) is shared via the Secret, and
+# strict pinning makes every replica load the same reviewed lockfile.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-guard
+  labels: {app: mcp-guard}
+spec:
+  replicas: 3
+  selector:
+    matchLabels: {app: mcp-guard}
+  template:
+    metadata:
+      labels: {app: mcp-guard}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: mcp-guard
+          image: ghcr.io/omid23/mcp-gaurd:0.1.0
+          args: ["serve", "--config", "/etc/mcp-guard/gateway.yaml"]
+          ports:
+            - {name: http, containerPort: 8800}
+          envFrom:
+            - secretRef: {name: mcp-guard-secrets}
+          env:
+            - {name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://otel-collector.observability:4318"}
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 15
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: "1", memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts:
+            - {name: config, mountPath: /etc/mcp-guard, readOnly: true}
+            - {name: audit, mountPath: /var/log/mcp-guard}
+      volumes:
+        - name: config
+          configMap: {name: mcp-guard-config}
+        - name: audit
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-guard
+  labels: {app: mcp-guard}
+spec:
+  selector: {app: mcp-guard}
+  ports:
+    - {name: http, port: 80, targetPort: http}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: mcp-guard
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: mcp-guard}
+  minReplicas: 3
+  maxReplicas: 12
+  metrics:
+    - type: Resource
+      resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mcp-guard
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels: {app: mcp-guard}
