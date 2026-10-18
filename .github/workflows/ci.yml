@@ -66,6 +66,7 @@ jobs:
           python -m venv /tmp/wheel-venv
           /tmp/wheel-venv/bin/pip install dist/*.whl
           /tmp/wheel-venv/bin/mcp-guard --help
+          cd /tmp && /tmp/wheel-venv/bin/mcp-guard eval -d sample --split all --out /tmp/wheel-reports --name wheel
       - uses: actions/upload-artifact@v4
         with:
           name: dist
