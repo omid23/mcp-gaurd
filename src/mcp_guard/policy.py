@@ -165,6 +165,10 @@ def description_signals(text: str, sibling_tools: list[str] | None = None) -> di
 STRONG_DESCRIPTION = {"hidden_unicode", "ignore_previous", "conceal_from_user", "instruction_tag"}
 
 
+def strip_hidden_unicode(text: str) -> str:
+    return _HIDDEN_UNICODE.sub("", text)
+
+
 def output_signals(text: str) -> dict[str, list[str]]:
     signals: dict[str, list[str]] = {}
     if _HIDDEN_UNICODE.search(text):

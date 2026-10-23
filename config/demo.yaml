@@ -16,7 +16,7 @@ decision:
 
 output_scan:
   enabled: true
-  action: quarantine
+  action: sanitize           # cut injected passages, keep the rest; quarantine withholds the whole result
   threshold: 0.7
 
 description_scan:

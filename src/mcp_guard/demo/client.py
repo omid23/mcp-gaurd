@@ -97,11 +97,12 @@ def _summ(msg: dict) -> tuple[str, str]:
     if result.get("resultType") == "input_required":
         return "ask", "approval requested"
     status = "blocked" if result.get("isError") else guard.get("decision", "allow")
-    if guard.get("output", {}).get("decision") == "deny":
-        status = "output withheld"
+    output = guard.get("output", {})
+    if output.get("decision") == "deny":
+        status = "output sanitized" if output.get("action") == "sanitized" else "output withheld"
     if msg.get("_rounds"):
         status += f" (after {len(msg['_rounds'])} approval round{'s' if len(msg['_rounds']) > 1 else ''})"
-    return status, text[:150]
+    return status, " ".join(text.split())[:150]
 
 
 async def run_demo(gateway_url: str, demo_url: str) -> list[tuple[str, str, str]]:

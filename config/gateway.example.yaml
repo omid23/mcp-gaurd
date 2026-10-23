@@ -34,7 +34,7 @@ decision:
   cache_ttl_s: 60
   max_state_chars: 6000
 
-output_scan: {enabled: true, action: quarantine, threshold: 0.7, max_chars: 12000}
+output_scan: {enabled: true, action: quarantine, threshold: 0.7, max_chars: 12000}   # action: quarantine | block | annotate | sanitize
 description_scan: {enabled: true, action: hide, threshold: 0.7}
 
 policy:

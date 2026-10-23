@@ -33,7 +33,7 @@ agent / MCP client ──► mcp-guard ──► MCP servers (GitHub, Postgres, 
 | Dangerous calls | Hard rules (credential paths, secrets, `rm -rf`, `DROP TABLE`, `curl … \| sh`) deny before anything else |
 | Exfiltration / privilege changes | External destinations outside an allowlist and permission changes escalate to a human |
 | Calls the agent was tricked into | Typed yes/no risk questions to the decision model, optionally with the user's request as intent |
-| Injection in tool output | Output scan; suspicious results are withheld or annotated before the model sees them |
+| Injection in tool output | Output scan; suspicious results are withheld or annotated before the model sees them, or (`action: sanitize`) only the injected passages are cut out |
 | Header/body desync | `Mcp-Method` / `Mcp-Name` / version headers must match the JSON-RPC body (`-32020`) |
 | Token passthrough | The client's `Authorization` header is never forwarded; upstream credentials come from config |
 | Accountability | Append-only JSONL audit (argument hashes, not arguments) + OTel spans with `gen_ai.*` / `mcp.*` attributes |
@@ -71,9 +71,9 @@ Expected output:
 4. read SSH key               blocked       credential or key path in arguments: /.ssh/, id_rsa
 5. rm -rf /                   blocked       destructive command: rm -rf
 6. email outside the org      allow (after 1 approval round)
-7. read inbox (injected)      output withheld
+7. read inbox (injected)      output sanitized   From: vendor@… Hi, please see the attached invoice. [mcp-guard removed a passage …]
 8. call poisoned tool         blocked       tool is quarantined (poisoned_description)
-9. weather alerts (injected)  output withheld   injection=0.90
+9. weather alerts (injected)  output sanitized   Wind advisory for Toronto until 18:00. [mcp-guard removed a passage …]
 10. deploy (server MRTR)      allow (after 1 approval round)   deployed build 1.4.2 to staging
 11. rug pull, list again      listed        hidden: get_time (rug_pull), get_forecast (poisoned_description)
 12. call rug-pulled tool      blocked       tool is quarantined (rug_pull)
@@ -197,7 +197,10 @@ an HPA, a PodDisruptionBudget and a ConfigMap. For several replicas:
 - Replay protection is per replica (a shared nonce store such as Redis would make it global). The signed
   state still expires and is bound to the exact call.
 - Trust-on-first-use pins are per replica and in memory; use strict mode in production.
-- Output scanning withholds whole results; it does not surgically remove the injected span.
+- `output_scan.action: sanitize` removes passages that carry injection signals and re-scans the rest.
+  When only the model objects (no passage can be pinned down) or the remainder still fails, it falls back
+  to withholding the whole result, so it never lets through more than `quarantine` would. Removal is
+  per sentence, line or `<tag>` block; an injection spread thinly across many sentences gets withheld.
 - The OpenTelemetry GenAI/MCP semantic conventions are still in Development status upstream; attribute
   names may change.
 - Decision-model scores are vendor claims until you run the eval on your own traffic. Calibration holds
@@ -213,10 +216,11 @@ src/mcp_guard/
   pinning.py        tool fingerprints, TOFU/strict pinning, lockfile
   approvals.py      HMAC-signed requestState, replay guard, elicitation forms
   registry.py       vetted, cached view of each server's tools (uses ttlMs)
+  sanitize.py       cuts injected passages out of tool output (output_scan.action: sanitize)
   guard/            questions, engine (thresholds, cache, fallback), backends: jev, llm_judge, classifier, heuristic
   eval/             dataset schema, MCPTox converter, runner and report
   demo/             honest + malicious demo MCP servers and a scripted client
-tests/              92 tests: end-to-end through the gateway, policy, approvals, backends, evals
+tests/              105 tests: end-to-end through the gateway, policy, approvals, backends, evals
 deploy/k8s/         Kubernetes manifests
 ```
 

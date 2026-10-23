@@ -105,7 +105,10 @@ class DecisionConfig(BaseModel):
 class OutputScanConfig(BaseModel):
     enabled: bool = True
     threshold: float = 0.7
-    action: Literal["quarantine", "block", "annotate"] = "quarantine"
+    # quarantine: withhold the whole result; block: withhold and mark isError;
+    # annotate: prepend a warning; sanitize: remove only the injected passages,
+    # falling back to quarantine if the remainder still fails the scan.
+    action: Literal["quarantine", "block", "annotate", "sanitize"] = "quarantine"
     max_chars: int = 12000
 
 
