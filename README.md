@@ -87,6 +87,9 @@ docker compose run --rm demo
 ```
 
 To use Jev: `MCPGUARD_BACKEND=jev TYPESAFE_API_KEY=… mcp-guard serve -c config/demo.yaml`.
+To use Gemini on Google Cloud: `gcloud auth application-default login`, then
+`MCPGUARD_BACKEND=vertex GOOGLE_CLOUD_PROJECT=your-project mcp-guard serve -c config/demo.yaml`
+(or set `GOOGLE_API_KEY` for Vertex AI express mode instead of ADC).
 
 ## Decision backends
 
@@ -98,6 +101,7 @@ so they can be swapped and compared with everything else held constant.
 | `heuristic` | Regex signals mapped to probabilities | Offline, free, the eval baseline and the runtime fallback |
 | `jev` | TypeSafe Jev over `/v1/systemone` | Many yes/no questions answered in parallel in one call; works with any server that speaks the same format (e.g. open-weight decision models) via `base_url` |
 | `llm` | Any OpenAI-compatible chat endpoint as a judge | Same questions, JSON probabilities |
+| `vertex` | Gemini on Google Cloud Vertex AI (`pip install -e ".[vertex]"`) | Same questions; a response schema forces one number per question. Auth by Application Default Credentials (Workload Identity on GKE, service account on Cloud Run) or an express-mode API key; `location` pins a region for data residency |
 | `classifier` | Local prompt-injection classifier (`pip install -e ".[classifier]"`) | Description/output gates; tool calls fall back to heuristic |
 
 How Jev is used, following TypeSafe's own guidance for `jev-1.13`:
@@ -117,7 +121,7 @@ How Jev is used, following TypeSafe's own guidance for `jev-1.13`:
 ```bash
 git clone https://github.com/zhiqiangwang4/MCPTox-Benchmark ../MCPTox-Benchmark
 mcp-guard mcptox --src ../MCPTox-Benchmark --out data/mcptox
-mcp-guard eval -d data/mcptox/descriptions.jsonl -d data/mcptox/calls.jsonl --split test -b heuristic,jev,llm
+mcp-guard eval -d data/mcptox/descriptions.jsonl -d data/mcptox/calls.jsonl --split test -b heuristic,jev,llm,vertex
 mcp-guard eval -d data/mcptox/calls.jsonl --split test --intent -b heuristic,jev     # with user intent
 mcp-guard eval ... --model-only                                                     # the model with no policy layer
 ```
@@ -217,10 +221,10 @@ src/mcp_guard/
   approvals.py      HMAC-signed requestState, replay guard, elicitation forms
   registry.py       vetted, cached view of each server's tools (uses ttlMs)
   sanitize.py       cuts injected passages out of tool output (output_scan.action: sanitize)
-  guard/            questions, engine (thresholds, cache, fallback), backends: jev, llm_judge, classifier, heuristic
+  guard/            questions, engine (thresholds, cache, fallback), backends: jev, llm_judge, vertex, classifier, heuristic
   eval/             dataset schema, MCPTox converter, runner and report
   demo/             honest + malicious demo MCP servers and a scripted client
-tests/              105 tests: end-to-end through the gateway, policy, approvals, backends, evals
+tests/              115 tests: end-to-end through the gateway, policy, approvals, backends, evals
 deploy/k8s/         Kubernetes manifests
 ```
 

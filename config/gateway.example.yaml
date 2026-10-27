@@ -18,7 +18,7 @@ auth:
   principal_header: x-forwarded-user
 
 decision:
-  backend: jev                     # heuristic | jev | llm | classifier
+  backend: jev                     # heuristic | jev | llm | vertex | classifier
   fallback: heuristic              # used when the primary backend errors
   thresholds: {deny: 0.85, ask: 0.5}
   jev:
@@ -31,6 +31,13 @@ decision:
     base_url: https://api.openai.com/v1
     model: gpt-6-luna
     api_key_env: OPENAI_API_KEY
+  vertex:                          # Gemini on Google Cloud (pip install -e ".[vertex]")
+    model: gemini-3.5-flash-lite
+    project: ${GOOGLE_CLOUD_PROJECT:-}   # empty: use the project from Application Default Credentials
+    location: global                 # or a region, e.g. europe-west4, for data residency
+    api_key_env: GOOGLE_API_KEY      # set it for express mode; leave unset to use ADC / Workload Identity
+    input_cost_per_mtok: 0           # fill in from the Vertex AI pricing page for eval cost reports
+    output_cost_per_mtok: 0
   cache_ttl_s: 60
   max_state_chars: 6000
 

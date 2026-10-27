@@ -84,6 +84,24 @@ class LLMJudgeConfig(BaseModel):
     output_cost_per_mtok: float = 0.50
 
 
+class VertexConfig(BaseModel):
+    # Gemini on Google Cloud Vertex AI. Auth: an API key (Vertex AI express mode)
+    # if api_key_env is set, otherwise Application Default Credentials (GKE
+    # Workload Identity, a service account, or `gcloud auth application-default login`).
+    model: str = "gemini-3.5-flash-lite"
+    project: str | None = None     # default: $GOOGLE_CLOUD_PROJECT, then the ADC project
+    location: str = "global"       # or a region such as us-central1 for data residency
+    api_key_env: str = "GOOGLE_API_KEY"
+    # Gemini's harm filters can block the attack text the judge has to read, so
+    # they are relaxed by default; set to null to keep the project's defaults.
+    safety_threshold: str | None = "BLOCK_NONE"
+    timeout_s: float = 10.0
+    max_retries: int = 2
+    # Set from the Vertex AI pricing page for your model; 0 reports no cost.
+    input_cost_per_mtok: float = 0.0
+    output_cost_per_mtok: float = 0.0
+
+
 class ClassifierConfig(BaseModel):
     model: str = "protectai/deberta-v3-base-prompt-injection-v2"
     injection_label: str = "INJECTION"
@@ -91,11 +109,12 @@ class ClassifierConfig(BaseModel):
 
 
 class DecisionConfig(BaseModel):
-    backend: Literal["heuristic", "jev", "llm", "classifier"] = "heuristic"
+    backend: Literal["heuristic", "jev", "llm", "vertex", "classifier"] = "heuristic"
     fallback: Literal["heuristic", "none"] = "heuristic"
     thresholds: Thresholds = Field(default_factory=Thresholds)
     jev: JevConfig = Field(default_factory=JevConfig)
     llm: LLMJudgeConfig = Field(default_factory=LLMJudgeConfig)
+    vertex: VertexConfig = Field(default_factory=VertexConfig)
     classifier: ClassifierConfig = Field(default_factory=ClassifierConfig)
     cache_ttl_s: float = 60.0
     cache_size: int = 4096

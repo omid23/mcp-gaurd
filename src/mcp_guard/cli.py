@@ -126,7 +126,7 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("eval", help="run eval cases through one or more decision backends")
     p.add_argument("--dataset", "-d", action="append", default=None,
                    help="'sample' or a JSONL path (repeatable)")
-    p.add_argument("--backends", "-b", default="heuristic", help="comma list: heuristic,jev,llm,classifier")
+    p.add_argument("--backends", "-b", default="heuristic", help="comma list: heuristic,jev,llm,vertex,classifier")
     p.add_argument("--config", "-c", default=None)
     p.add_argument("--split", default="test", choices=["dev", "test", "all"])
     p.add_argument("--kind", action="append", choices=["tool_call", "tool_description", "tool_output"])

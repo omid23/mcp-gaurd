@@ -9,10 +9,11 @@ from .heuristic import HeuristicBackend
 from .jev import JevBackend
 from .llm_judge import LLMJudgeBackend
 from .models import Answer, DecisionBackend, DecisionError, DecisionResponse, Question
+from .vertex import VertexBackend
 
 __all__ = [
     "Answer", "ClassifierBackend", "DecisionBackend", "DecisionError", "DecisionResponse", "GuardEngine",
-    "HeuristicBackend", "JevBackend", "LLMJudgeBackend", "Question", "Verdict", "build_backend",
+    "HeuristicBackend", "JevBackend", "LLMJudgeBackend", "Question", "Verdict", "VertexBackend", "build_backend",
 ]
 
 
@@ -22,6 +23,8 @@ def build_backend(name: str, settings: Settings, client: httpx.AsyncClient | Non
         return JevBackend(dc.jev, client)
     if name == "llm":
         return LLMJudgeBackend(dc.llm, client)
+    if name == "vertex":
+        return VertexBackend(dc.vertex, client)
     if name == "classifier":
         return ClassifierBackend(dc.classifier)
     if name == "heuristic":

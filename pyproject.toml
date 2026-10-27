@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Omid" }]
-keywords = ["mcp", "model-context-protocol", "ai-security", "guardrails", "jev", "decision-models", "agents"]
+keywords = ["mcp", "model-context-protocol", "ai-security", "guardrails", "jev", "decision-models", "agents", "vertex-ai", "gemini"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "License :: OSI Approved :: MIT License",
@@ -29,6 +29,7 @@ dependencies = [
 [project.optional-dependencies]
 otlp = ["opentelemetry-exporter-otlp-proto-http>=1.24"]
 classifier = ["transformers>=4.40", "torch>=2.2"]
+vertex = ["google-auth[requests]>=2.29"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.5"]
 
 [project.scripts]

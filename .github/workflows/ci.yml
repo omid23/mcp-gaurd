@@ -38,7 +38,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           cache: pip
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ".[dev,vertex]"
       - run: pytest -q
       - name: Regression eval (built-in sample, offline)
         run: mcp-guard eval -d sample --split all --intent --out reports --name ci-sample

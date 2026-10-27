@@ -19,6 +19,8 @@ services:
       MCPGUARD_STATE_SECRET: ${MCPGUARD_STATE_SECRET:-change-me-in-production}
       MCPGUARD_BACKEND: ${MCPGUARD_BACKEND:-heuristic}
       TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       MCPGUARD_AUDIT: /tmp/audit.jsonl
     depends_on:

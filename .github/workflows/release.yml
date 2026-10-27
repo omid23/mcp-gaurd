@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ".[dev,vertex]"
       - run: ruff check src tests
       - run: pytest -q
       - name: Tag must match pyproject version

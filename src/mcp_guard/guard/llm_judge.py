@@ -29,6 +29,37 @@ SYSTEM_PROMPT = (
 RETRY_STATUS = {429, 500, 502, 503, 504, 529}
 
 
+def build_prompt(state: Any, questions: dict[str, Question]) -> str:
+    qs = {}
+    for qid, q in questions.items():
+        entry = {"question": q.instructions}
+        if isinstance(q.criteria, dict):
+            entry["yes_means"] = q.criteria.get("true")
+            entry["no_means"] = q.criteria.get("false")
+        qs[qid] = entry
+    return f"STATE:\n{canonical_json(state)}\n\nQUESTIONS:\n{json.dumps(qs, indent=1)}"
+
+
+def parse_probabilities(content: str, questions: dict[str, Question], who: str) -> dict[str, Answer]:
+    """Read a {question_id: probability} JSON object out of a model's reply."""
+    match = re.search(r"\{[\s\S]*\}", content)
+    if not match:
+        raise DecisionError(f"{who} did not return JSON")
+    try:
+        probs = json.loads(match.group(0))
+    except json.JSONDecodeError as exc:
+        raise DecisionError(f"{who} returned invalid JSON") from exc
+    answers: dict[str, Answer] = {}
+    for qid in questions:
+        value = probs.get(qid)
+        if isinstance(value, bool):
+            value = 1.0 if value else 0.0
+        if not isinstance(value, (int, float)):
+            raise DecisionError(f"{who} missing probability for '{qid}'")
+        answers[qid] = Answer("noul", noul=min(1.0, max(0.0, float(value))))
+    return answers
+
+
 class LLMJudgeBackend:
     name = "llm"
 
@@ -37,16 +68,6 @@ class LLMJudgeBackend:
         self._own_client = client is None
         self._client = client or httpx.AsyncClient(timeout=config.timeout_s)
 
-    def _prompt(self, state: Any, questions: dict[str, Question]) -> str:
-        qs = {}
-        for qid, q in questions.items():
-            entry = {"question": q.instructions}
-            if isinstance(q.criteria, dict):
-                entry["yes_means"] = q.criteria.get("true")
-                entry["no_means"] = q.criteria.get("false")
-            qs[qid] = entry
-        return f"STATE:\n{canonical_json(state)}\n\nQUESTIONS:\n{json.dumps(qs, indent=1)}"
-
     async def evaluate(self, state: Any, questions: dict[str, Question]) -> DecisionResponse:
         body = {
             "model": self.config.model,
@@ -54,7 +75,7 @@ class LLMJudgeBackend:
             "response_format": {"type": "json_object"},
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": self._prompt(state, questions)},
+                {"role": "user", "content": build_prompt(state, questions)},
             ],
         }
         headers = {"Content-Type": "application/json"}
@@ -84,21 +105,7 @@ class LLMJudgeBackend:
             content = data["choices"][0]["message"]["content"] or ""
         except (KeyError, IndexError, TypeError) as exc:
             raise DecisionError("llm judge response has no message content") from exc
-        match = re.search(r"\{[\s\S]*\}", content)
-        if not match:
-            raise DecisionError("llm judge did not return JSON")
-        try:
-            probs = json.loads(match.group(0))
-        except json.JSONDecodeError as exc:
-            raise DecisionError("llm judge returned invalid JSON") from exc
-        answers: dict[str, Answer] = {}
-        for qid in questions:
-            value = probs.get(qid)
-            if isinstance(value, bool):
-                value = 1.0 if value else 0.0
-            if not isinstance(value, (int, float)):
-                raise DecisionError(f"llm judge missing probability for '{qid}'")
-            answers[qid] = Answer("noul", noul=min(1.0, max(0.0, float(value))))
+        answers = parse_probabilities(content, questions, "llm judge")
         usage = data.get("usage") or {}
         in_tok = int(usage.get("prompt_tokens") or 0)
         out_tok = int(usage.get("completion_tokens") or 0)

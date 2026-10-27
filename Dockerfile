@@ -8,7 +8,7 @@ WORKDIR /app
 COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
 COPY config ./config
-RUN pip install ".[otlp]" && useradd --system --uid 10001 guard
+RUN pip install ".[otlp,vertex]" && useradd --system --uid 10001 guard
 
 USER 10001
 EXPOSE 8800
